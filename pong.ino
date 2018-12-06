@@ -168,7 +168,7 @@ void loop()
       strip_leds[hit_zone] = CRGB::Black;
       strip_leds[STRIP_NUM_LEDS-1-hit_zone] = CRGB::Black;
       //update ball
-      int intensity = bounce/6;
+      int intensity = bounce/3;
       virtual_ball += serve*(2+intensity);
       hit_zone = MAX_HIT_ZONE-intensity;
       if(hit_zone < 3) hit_zone = 3;

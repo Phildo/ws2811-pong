@@ -346,7 +346,7 @@ void loop()
         int pulse_t = SCORE_T/10;
         int pulse_is = hit_zone_a+(( mode_t   %pulse_t)*body_leds/pulse_t);
         int pulse_ie = hit_zone_a+(((mode_t+1)%pulse_t)*body_leds/pulse_t);
-        if(mode_t == pulse_t-1) pulse_ie = STRIP_NUM_LEDS-hit_zone_b+1;
+        if((mode_t+1)%pulse_t == 0) pulse_ie = STRIP_NUM_LEDS-hit_zone_b+1;
         if(pulse_is == pulse_ie) pulse_ie++;
         for(int i = pulse_is; i < pulse_ie; i++)
           strip_leds[i] = color_a;
@@ -359,7 +359,7 @@ void loop()
         int pulse_t = SCORE_T/10;
         int pulse_is = hit_zone_b+(( mode_t   %pulse_t)*body_leds/pulse_t);
         int pulse_ie = hit_zone_b+(((mode_t+1)%pulse_t)*body_leds/pulse_t);
-        if(mode_t == pulse_t-1) pulse_ie = STRIP_NUM_LEDS-hit_zone_a+1;
+        if((mode_t+1)%pulse_t == 0) pulse_ie = STRIP_NUM_LEDS-hit_zone_a+1;
         if(pulse_is == pulse_ie) pulse_ie++;
         for(int i = pulse_is; i < pulse_ie; i++)
           strip_leds[back(i)] = color_b;

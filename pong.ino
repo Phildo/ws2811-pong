@@ -3,12 +3,16 @@
 //logic
 #define MAX_HIT_ZONE 10
 #define VIRTUAL_LEDS 800
-#define MODE_SIGNUP 0
-#define MODE_PLAY 1
-#define MODE_SCORE 2
+#define STATE_SIGNUP 0
+#define STATE_PLAY 1
+#define STATE_SCORE 2
+#define MODE_IMMEDIATE 0
+#define MODE_HOLD 1
 #define SCORE_T 100
+int state;
+unsigned int state_t;
 int mode;
-unsigned int mode_t;
+int mode_mute_t;
 int local_score_a;
 int local_score_b;
 int speed;
@@ -52,6 +56,8 @@ CRGB strip_subleds_body[STRIP_NUM_LEDS-(MAX_HIT_ZONE*2)];
 //btns
 #define BTN_A_PIN 8
 #define BTN_B_PIN 9
+#define BTN_MODE_PIN 10
+#define BTN_MODE_GND 12
 
 int back(int i)
 {
@@ -92,22 +98,27 @@ void setup()
   //btns
   pinMode(BTN_A_PIN,INPUT_PULLUP);
   pinMode(BTN_B_PIN,INPUT_PULLUP);
+  pinMode(BTN_MODE_PIN,INPUT_PULLUP);
+  pinMode(BTN_MODE_GND,OUTPUT);
+  digitalWrite(BTN_MODE_GND,LOW);
 
   btn_a_down_t = 0;
   btn_a_up_t = 0;
   btn_b_down_t = 0;
   btn_b_up_t = 0;
 
-  set_mode(MODE_SIGNUP);
+  mode = MODE_IMMEDIATE;
+  mode_mute_t = 0;
+  set_state(STATE_SIGNUP);
 }
 
-void set_mode(int m)
+void set_state(int s)
 {
-  mode = m;
-  mode_t = 0;
-  switch(mode)
+  state = s;
+  state_t = 0;
+  switch(state)
   {
-    case MODE_SIGNUP:
+    case STATE_SIGNUP:
     {
       if(btn_a_down_t >= btn_b_down_t)
       {
@@ -125,7 +136,7 @@ void set_mode(int m)
       particle_b_t = STRIP_FADE_N;
     }
       break;
-    case MODE_PLAY:
+    case STATE_PLAY:
     {
       speed = 3;
       hit_zone_a = MAX_HIT_ZONE;
@@ -152,7 +163,7 @@ void set_mode(int m)
       particle_b_t = STRIP_FADE_N;
     }
       break;
-    case MODE_SCORE:
+    case STATE_SCORE:
     {
     }
       break;
@@ -162,41 +173,43 @@ void set_mode(int m)
 void loop()
 {
   //get input
+  if(!mode_mute_t && !digitalRead(BTN_MODE_PIN)) { mode = (mode+1)%2; mode_mute_t = 10; }
+  else if(mode_mute_t) mode_mute_t--;
   if(!digitalRead(BTN_A_PIN)) { btn_a_down_t++; btn_a_up_t = 0; }
   else { btn_a_down_t = 0; btn_a_up_t++; }
   if(!digitalRead(BTN_B_PIN)) { btn_b_down_t++; btn_b_up_t = 0; }
   else { btn_b_down_t = 0; btn_b_up_t++; }
 
-  mode_t++;       if(mode_t       == 0) mode_t = -1; //keep at max
+  state_t++;      if(state_t      == 0) state_t = -1; //keep at max
   particle_a_t++; if(particle_a_t == 0) particle_a_t = -1; //keep at max
   particle_b_t++; if(particle_b_t == 0) particle_b_t = -1; //keep at max
 
   //update
-  switch(mode)
+  switch(state)
   {
-    case MODE_SIGNUP:
+    case STATE_SIGNUP:
     {
       if(btn_a_down_t && !btn_b_down_t && btn_a_down_t%MAX_HIT_ZONE == 0) particle_a_t = 0;
       if(btn_b_down_t && !btn_a_down_t && btn_b_down_t%MAX_HIT_ZONE == 0) particle_b_t = 0;
       int t = btn_a_down_t;
       if(btn_b_down_t < btn_a_down_t) t = btn_b_down_t;
-      if(t >= STRIP_NUM_LEDS/2) set_mode(MODE_PLAY);
+      if(t >= STRIP_NUM_LEDS/2) set_state(STATE_PLAY);
     }
       break;
-    case MODE_PLAY:
+    case STATE_PLAY:
     {
       //release
       if(btn_a_up_t) btn_a_hitting = 0;
       if(btn_b_up_t) btn_b_hitting = 0;
 
-      if(!btn_a_hitting && !btn_b_hitting)
+      if(mode == MODE_IMMEDIATE || (!btn_a_hitting && !btn_b_hitting))
       {
         //update ball
         virtual_ball += serve*speed;
         int old_ball = ball;
         ball = virtual_ball*STRIP_NUM_LEDS/VIRTUAL_LEDS;
-        if(ball >= STRIP_NUM_LEDS) { ball = back(0); set_mode(MODE_SCORE); break; }
-        else if(ball < 0)          { ball = 0;       set_mode(MODE_SCORE); break; }
+        if(ball >= STRIP_NUM_LEDS) { ball = back(0); set_state(STATE_SCORE); break; }
+        else if(ball < 0)          { ball = 0;       set_state(STATE_SCORE); break; }
 
         //clear hits at midpoint
              if(serve ==  1 && btn_b_hit != -1 && old_ball < STRIP_NUM_LEDS/2 && ball >= STRIP_NUM_LEDS/2) btn_b_hit = -1;
@@ -246,17 +259,17 @@ void loop()
       }
     }
       break;
-    case MODE_SCORE:
+    case STATE_SCORE:
     {
-      if(mode_t > SCORE_T) set_mode(MODE_SIGNUP);
+      if(state_t > SCORE_T) set_state(STATE_SIGNUP);
     }
       break;
   }
 
   //draw
-  switch(mode)
+  switch(state)
   {
-    case MODE_SIGNUP:
+    case STATE_SIGNUP:
     {
       clear_strip();
 
@@ -310,7 +323,7 @@ void loop()
       FastLED.delay(30);
     }
       break;
-    case MODE_PLAY:
+    case STATE_PLAY:
     {
       clear_strip();
       //clear for shrunken zones
@@ -352,7 +365,7 @@ void loop()
       FastLED.delay(1);
     }
       break;
-    case MODE_SCORE:
+    case STATE_SCORE:
     {
       clear_strip();
       //clear for shrunken zones
@@ -363,26 +376,26 @@ void loop()
 
       if(serve == 1) //a scored
       {
-        strip_leds[mode_t%hit_zone_a] = color_a;
-        strip_leds[STRIP_NUM_LEDS-hit_zone_b+(mode_t%hit_zone_b)] = color_a;
+        strip_leds[state_t%hit_zone_a] = color_a;
+        strip_leds[STRIP_NUM_LEDS-hit_zone_b+(state_t%hit_zone_b)] = color_a;
         int body_leds = STRIP_NUM_LEDS-hit_zone_a-hit_zone_b+2;
         int pulse_t = SCORE_T/10;
-        int pulse_is = hit_zone_a+(( mode_t   %pulse_t)*body_leds/pulse_t);
-        int pulse_ie = hit_zone_a+(((mode_t+1)%pulse_t)*body_leds/pulse_t);
-        if((mode_t+1)%pulse_t == 0) pulse_ie = STRIP_NUM_LEDS-hit_zone_b+1;
+        int pulse_is = hit_zone_a+(( state_t   %pulse_t)*body_leds/pulse_t);
+        int pulse_ie = hit_zone_a+(((state_t+1)%pulse_t)*body_leds/pulse_t);
+        if((state_t+1)%pulse_t == 0) pulse_ie = STRIP_NUM_LEDS-hit_zone_b+1;
         if(pulse_is == pulse_ie) pulse_ie++;
         for(int i = pulse_is; i < pulse_ie; i++)
           strip_leds[i] = color_a;
       }
       else if(serve == -1) //b scored
       {
-        strip_leds[hit_zone_a-1-(mode_t%hit_zone_a)] = color_b;
-        strip_leds[STRIP_NUM_LEDS-1-(mode_t%hit_zone_b)] = color_b;
+        strip_leds[hit_zone_a-1-(state_t%hit_zone_a)] = color_b;
+        strip_leds[STRIP_NUM_LEDS-1-(state_t%hit_zone_b)] = color_b;
         int body_leds = STRIP_NUM_LEDS-hit_zone_a-hit_zone_b+2;
         int pulse_t = SCORE_T/10;
-        int pulse_is = hit_zone_b+(( mode_t   %pulse_t)*body_leds/pulse_t);
-        int pulse_ie = hit_zone_b+(((mode_t+1)%pulse_t)*body_leds/pulse_t);
-        if((mode_t+1)%pulse_t == 0) pulse_ie = STRIP_NUM_LEDS-hit_zone_a+1;
+        int pulse_is = hit_zone_b+(( state_t   %pulse_t)*body_leds/pulse_t);
+        int pulse_ie = hit_zone_b+(((state_t+1)%pulse_t)*body_leds/pulse_t);
+        if((state_t+1)%pulse_t == 0) pulse_ie = STRIP_NUM_LEDS-hit_zone_a+1;
         if(pulse_is == pulse_ie) pulse_ie++;
         for(int i = pulse_is; i < pulse_ie; i++)
           strip_leds[back(i)] = color_b;

@@ -8,7 +8,7 @@
 #define MODE_SCORE 2
 #define SCORE_T 100
 int mode;
-unsigned long mode_t;
+unsigned int mode_t;
 int local_score_a;
 int local_score_b;
 int speed;
@@ -19,16 +19,18 @@ long ball;
 int server;
 int serve;
 int bounce;
-int btn_a_down_t;
-int btn_a_up_t;
-int btn_b_down_t;
-int btn_b_up_t;
+unsigned int btn_a_down_t;
+unsigned int btn_a_up_t;
+unsigned int btn_b_down_t;
+unsigned int btn_b_up_t;
 int btn_a_hit;
-int btn_a_hit_t;
+int btn_a_hitting;
+unsigned int btn_a_hit_t;
 int btn_b_hit;
-int btn_b_hit_t;
-int particle_a_t;
-int particle_b_t;
+int btn_b_hitting;
+unsigned int btn_b_hit_t;
+unsigned int particle_a_t;
+unsigned int particle_b_t;
 
 //strip
 #define STRIP_LED_PIN     3
@@ -65,7 +67,7 @@ void clear_strip()
 
 void setup()
 {
-  delay(3000); //power-up safety delay
+  delay(300); //power-up safety delay
 
   //strip
   color_a = CRGB::Blue;
@@ -107,6 +109,16 @@ void set_mode(int m)
   {
     case MODE_SIGNUP:
     {
+      if(btn_a_down_t >= btn_b_down_t)
+      {
+        btn_a_down_t = 1;
+        btn_b_down_t = 0;
+      }
+      else
+      {
+        btn_a_down_t = 0;
+        btn_b_down_t = 1;
+      }
       local_score_a = 0;
       local_score_b = 0;
       particle_a_t = STRIP_FADE_N;
@@ -133,7 +145,9 @@ void set_mode(int m)
       serve = server;
       bounce = 0;
       btn_a_hit = -1;
+      btn_a_hitting = 0;
       btn_b_hit = -1;
+      btn_b_hitting = 0;
       particle_a_t = STRIP_FADE_N;
       particle_b_t = STRIP_FADE_N;
     }
@@ -153,9 +167,9 @@ void loop()
   if(!digitalRead(BTN_B_PIN)) { btn_b_down_t++; btn_b_up_t = 0; }
   else { btn_b_down_t = 0; btn_b_up_t++; }
 
-  mode_t++; if(mode_t == 0) mode_t--; //keep at max
-  particle_a_t++;
-  particle_b_t++;
+  mode_t++;       if(mode_t       == 0) mode_t = -1; //keep at max
+  particle_a_t++; if(particle_a_t == 0) particle_a_t = -1; //keep at max
+  particle_b_t++; if(particle_b_t == 0) particle_b_t = -1; //keep at max
 
   //update
   switch(mode)
@@ -171,55 +185,64 @@ void loop()
       break;
     case MODE_PLAY:
     {
-      //update ball
-      virtual_ball += serve*speed;
-      int old_ball = ball;
-      ball = virtual_ball*STRIP_NUM_LEDS/VIRTUAL_LEDS;
-      if(ball >= STRIP_NUM_LEDS) { ball = back(0); set_mode(MODE_SCORE); break; }
-      else if(ball < 0)          { ball = 0;       set_mode(MODE_SCORE); break; }
+      //release
+      if(btn_a_up_t) btn_a_hitting = 0;
+      if(btn_b_up_t) btn_b_hitting = 0;
 
-      //clear hits at midpoint
-           if(serve ==  1 && btn_b_hit != -1 && old_ball < STRIP_NUM_LEDS/2 && ball >= STRIP_NUM_LEDS/2) btn_b_hit = -1;
-      else if(serve == -1 && btn_a_hit != -1 && old_ball > STRIP_NUM_LEDS/2 && ball <= STRIP_NUM_LEDS/2) btn_a_hit = -1;
+      if(!btn_a_hitting && !btn_b_hitting)
+      {
+        //update ball
+        virtual_ball += serve*speed;
+        int old_ball = ball;
+        ball = virtual_ball*STRIP_NUM_LEDS/VIRTUAL_LEDS;
+        if(ball >= STRIP_NUM_LEDS) { ball = back(0); set_mode(MODE_SCORE); break; }
+        else if(ball < 0)          { ball = 0;       set_mode(MODE_SCORE); break; }
 
-      //handle hits
-      int bounced = 0;
-      if(btn_a_hit == -1 && btn_a_down_t == 1)
-      {
-         btn_a_hit = ball;
-         particle_a_t = 0;
-         if(serve == -1)
-         {
-           if(ball < hit_zone_a)
-           {
-             serve = 1;
-             bounced = 1;
-           }
-         }
-      }
-      if(btn_b_hit == -1 && btn_b_down_t == 1)
-      {
-        btn_b_hit = ball;
-        particle_b_t = 0;
-        if(serve == 1)
+        //clear hits at midpoint
+             if(serve ==  1 && btn_b_hit != -1 && old_ball < STRIP_NUM_LEDS/2 && ball >= STRIP_NUM_LEDS/2) btn_b_hit = -1;
+        else if(serve == -1 && btn_a_hit != -1 && old_ball > STRIP_NUM_LEDS/2 && ball <= STRIP_NUM_LEDS/2) btn_a_hit = -1;
+
+        //handle hits
+        int bounced = 0;
+        if(btn_a_hit == -1 && btn_a_down_t == 1)
         {
-          if(ball > back(hit_zone_b))
+          btn_a_hit = ball;
+          particle_a_t = 0;
+          if(serve == -1)
           {
-            serve = -1;
-            bounced = 1;
+            if(ball < hit_zone_a)
+            {
+              btn_a_hitting = 1;
+              serve = 1;
+              bounced = 1;
+            }
           }
         }
-      }
-      if(bounced)
-      {
-        bounce++;
-        speed = 3+(bounce/3);
-        if(serve == 1) //a served
-          hit_zone_a = MAX_HIT_ZONE-((bounce+2)/3);
-        else //b served
-          hit_zone_b = MAX_HIT_ZONE-((bounce+2)/3);
-        if(hit_zone_a < 4) hit_zone_a = 4;
-        if(hit_zone_b < 4) hit_zone_b = 4;
+        if(btn_b_hit == -1 && btn_b_down_t == 1)
+        {
+          btn_b_hit = ball;
+          particle_b_t = 0;
+          if(serve == 1)
+          {
+            if(ball > back(hit_zone_b))
+            {
+              btn_b_hitting = 1;
+              serve = -1;
+              bounced = 1;
+            }
+          }
+        }
+        if(bounced)
+        {
+          bounce++;
+          speed = 3+(bounce/3);
+          if(serve == 1) //a served
+            hit_zone_a = MAX_HIT_ZONE-((bounce+2)/3);
+          else //b served
+            hit_zone_b = MAX_HIT_ZONE-((bounce+2)/3);
+          if(hit_zone_a < 4) hit_zone_a = 4;
+          if(hit_zone_b < 4) hit_zone_b = 4;
+        }
       }
     }
       break;

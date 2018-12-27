@@ -6,8 +6,9 @@
 #define STATE_SIGNUP 0
 #define STATE_PLAY 1
 #define STATE_SCORE 2
-#define MODE_IMMEDIATE 0
-#define MODE_HOLD 1
+#define MODE_BOUNCY 0
+#define MODE_STICKY 1
+#define MODE_COUNT 2
 #define SCORE_T 100
 int state;
 unsigned int state_t;
@@ -46,7 +47,8 @@ unsigned int particle_b_t;
 CRGB color_a;
 CRGB color_b;
 CRGB color_ball;
-CRGB color_zone;
+CRGB color_zone_bouncy;
+CRGB color_zone_sticky;
 CRGB color_dark;
 CRGB color_particle_fade[STRIP_FADE_N];
 CRGB strip_leds[STRIP_NUM_LEDS];
@@ -75,21 +77,27 @@ void setup()
 {
   delay(300); //power-up safety delay
 
+  mode = MODE_BOUNCY;
   //strip
   color_a = CRGB::Blue;
   color_b = CRGB::Red;
   color_ball = CRGB::White;
-  color_zone = CRGB::Yellow;
-  color_zone.r /= 2;
-  color_zone.g /= 2;
-  color_zone.b /= 2;
+  color_zone_bouncy = CRGB::Yellow;
+  color_zone_bouncy.r /= 2;
+  color_zone_bouncy.g /= 2;
+  color_zone_bouncy.b /= 2;
+  color_zone_sticky = CRGB::Green;
+  color_zone_sticky.r /= 2;
+  color_zone_sticky.g /= 2;
+  color_zone_sticky.b /= 2;
   color_dark = CRGB::Black;
   for(int i = 0; i < STRIP_FADE_N; i++)
   {
     int l = 255-(255*(i+1)/(STRIP_FADE_N+1));
     color_particle_fade[i] = CRGB(l,l,l);
   }
-  for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone;
+  if(mode == MODE_BOUNCY) for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone_bouncy;
+  else                    for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone_sticky;
   for(int i = 0; i < STRIP_NUM_LEDS-(MAX_HIT_ZONE*2); i++) strip_subleds_body[i] = color_dark;
   clear_strip();
   FastLED.addLeds<STRIP_LED_TYPE, STRIP_LED_PIN, STRIP_COLOR_ORDER>(strip_leds, STRIP_NUM_LEDS).setCorrection( TypicalLEDStrip );
@@ -106,9 +114,8 @@ void setup()
   btn_a_up_t = 0;
   btn_b_down_t = 0;
   btn_b_up_t = 0;
-
-  mode = MODE_IMMEDIATE;
   mode_mute_t = 0;
+
   set_state(STATE_SIGNUP);
 }
 
@@ -173,7 +180,13 @@ void set_state(int s)
 void loop()
 {
   //get input
-  if(!mode_mute_t && !digitalRead(BTN_MODE_PIN)) { mode = (mode+1)%2; mode_mute_t = 10; }
+  if(!mode_mute_t && !digitalRead(BTN_MODE_PIN))
+  {
+    mode = (mode+1)%MODE_COUNT;
+    mode_mute_t = 10;
+    if(mode == MODE_BOUNCY) for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone_bouncy;
+    else                    for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone_sticky;
+  }
   else if(mode_mute_t) mode_mute_t--;
   if(!digitalRead(BTN_A_PIN)) { btn_a_down_t++; btn_a_up_t = 0; }
   else { btn_a_down_t = 0; btn_a_up_t++; }
@@ -202,7 +215,7 @@ void loop()
       if(btn_a_up_t) btn_a_hitting = 0;
       if(btn_b_up_t) btn_b_hitting = 0;
 
-      if(mode == MODE_IMMEDIATE || (!btn_a_hitting && !btn_b_hitting))
+      if(mode == MODE_BOUNCY || (!btn_a_hitting && !btn_b_hitting))
       {
         //update ball
         virtual_ball += serve*speed;

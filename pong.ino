@@ -6,14 +6,20 @@
 #define STATE_SIGNUP 0
 #define STATE_PLAY 1
 #define STATE_SCORE 2
+#define ZONE_COLOR_SAME 0
+#define ZONE_COLOR_PLAYER 1
+#define ZONE_COLOR_COUNT 2
 #define MODE_BOUNCY 0
 #define MODE_STICKY 1
 #define MODE_COUNT 2
 #define SCORE_T 100
+
 int state;
 unsigned int state_t;
 int mode;
 int mode_mute_t;
+int zone_color;
+int zone_color_mute_t;
 int local_score_a;
 int local_score_b;
 int speed;
@@ -44,6 +50,17 @@ unsigned int particle_b_t;
 #define STRIP_LED_TYPE    WS2811
 #define STRIP_COLOR_ORDER BRG
 #define STRIP_FADE_N 10
+
+CRGB black;
+CRGB white;
+CRGB red;
+CRGB green;
+CRGB blue;
+CRGB yellow;
+CRGB light_blue;
+CRGB dark_blue;
+CRGB pink;
+
 CRGB color_a;
 CRGB color_b;
 CRGB color_ball;
@@ -52,7 +69,8 @@ CRGB color_zone_sticky;
 CRGB color_dark;
 CRGB color_particle_fade[STRIP_FADE_N];
 CRGB strip_leds[STRIP_NUM_LEDS];
-CRGB strip_subleds_zone[MAX_HIT_ZONE];
+CRGB strip_subleds_zone_a[MAX_HIT_ZONE];
+CRGB strip_subleds_zone_b[MAX_HIT_ZONE];
 CRGB strip_subleds_body[STRIP_NUM_LEDS-(MAX_HIT_ZONE*2)];
 
 //btns
@@ -60,45 +78,80 @@ CRGB strip_subleds_body[STRIP_NUM_LEDS-(MAX_HIT_ZONE*2)];
 #define BTN_B_PIN 9
 #define BTN_MODE_PIN 10
 #define BTN_MODE_GND 12
+#define BTN_ZONE_COLOR_PIN 11
+#define BTN_ZONE_COLOR_GND 12
 
 int back(int i)
 {
   return STRIP_NUM_LEDS-1-i;
 }
 
+void set_color_blits()
+{
+  for(int i = 0; i < STRIP_FADE_N; i++)
+  {
+    int l = 255-(255*(i+1)/(STRIP_FADE_N+1));
+    color_particle_fade[i] = CRGB(l,l,l);
+  }
+  if(zone_color == ZONE_COLOR_SAME)
+  {
+    if(mode == MODE_BOUNCY)
+    {
+      for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone_a[i] = color_zone_bouncy;
+      for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone_b[i] = color_zone_bouncy;
+    }
+    else
+    {
+      for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone_a[i] = color_zone_sticky;
+      for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone_b[i] = color_zone_sticky;
+    }
+  }
+  else
+  {
+    for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone_a[i] = color_a;
+    for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone_b[i] = color_b;
+  }
+  for(int i = 0; i < STRIP_NUM_LEDS-(MAX_HIT_ZONE*2); i++) strip_subleds_body[i] = color_dark;
+}
+
 void clear_strip()
 {
-  memmove8(&strip_leds[0], &strip_subleds_zone[0], MAX_HIT_ZONE*sizeof(CRGB));
+  memmove8(&strip_leds[0], &strip_subleds_zone_a[0], MAX_HIT_ZONE*sizeof(CRGB));
   memmove8(&strip_leds[MAX_HIT_ZONE], &strip_subleds_body[0], (STRIP_NUM_LEDS-(MAX_HIT_ZONE*2))*sizeof(CRGB));
-  memmove8(&strip_leds[STRIP_NUM_LEDS-MAX_HIT_ZONE], &strip_subleds_zone[0], MAX_HIT_ZONE*sizeof(CRGB));
+  memmove8(&strip_leds[STRIP_NUM_LEDS-MAX_HIT_ZONE], &strip_subleds_zone_b[0], MAX_HIT_ZONE*sizeof(CRGB));
 }
 
 void setup()
 {
   delay(300); //power-up safety delay
 
+  //helpful constants for color-picking
+  black      = CRGB(0x00,0x00,0x00); //CRGB::Black;
+  white      = CRGB(0xFF,0xFF,0xFF); //CRGB::White;
+  red        = CRGB(0xFF,0x00,0x00); //CRGB::Red;
+  green      = CRGB(0x00,0xFF,0x00); //CRGB::Green;
+  blue       = CRGB(0x00,0x00,0xFF); //CRGB::Blue;
+  yellow     = CRGB(0xFF,0xFF,0x00); //CRGB::Yellow;
+  light_blue = CRGB(0x4E,0xFD,0xEE);
+  dark_blue  = CRGB(0x3C,0x44,0xE8);
+  pink       = CRGB(0xF6,0x49,0xC7);
+
   mode = MODE_BOUNCY;
+  zone_color = ZONE_COLOR_SAME;
   //strip
-  color_a = CRGB::Blue;
-  color_b = CRGB::Red;
-  color_ball = CRGB::White;
-  color_zone_bouncy = CRGB::Yellow;
+  color_a = light_blue;
+  color_b = dark_blue;
+  color_ball = pink;
+  color_zone_bouncy = yellow;
   color_zone_bouncy.r /= 2;
   color_zone_bouncy.g /= 2;
   color_zone_bouncy.b /= 2;
-  color_zone_sticky = CRGB::Green;
+  color_zone_sticky = green;
   color_zone_sticky.r /= 2;
   color_zone_sticky.g /= 2;
   color_zone_sticky.b /= 2;
-  color_dark = CRGB::Black;
-  for(int i = 0; i < STRIP_FADE_N; i++)
-  {
-    int l = 255-(255*(i+1)/(STRIP_FADE_N+1));
-    color_particle_fade[i] = CRGB(l,l,l);
-  }
-  if(mode == MODE_BOUNCY) for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone_bouncy;
-  else                    for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone_sticky;
-  for(int i = 0; i < STRIP_NUM_LEDS-(MAX_HIT_ZONE*2); i++) strip_subleds_body[i] = color_dark;
+  color_dark = black;
+  set_color_blits();
   clear_strip();
   FastLED.addLeds<STRIP_LED_TYPE, STRIP_LED_PIN, STRIP_COLOR_ORDER>(strip_leds, STRIP_NUM_LEDS).setCorrection( TypicalLEDStrip );
   FastLED.setBrightness(STRIP_BRIGHTNESS);
@@ -109,12 +162,16 @@ void setup()
   pinMode(BTN_MODE_PIN,INPUT_PULLUP);
   pinMode(BTN_MODE_GND,OUTPUT);
   digitalWrite(BTN_MODE_GND,LOW);
+  pinMode(BTN_ZONE_COLOR_PIN,INPUT_PULLUP);
+  pinMode(BTN_ZONE_COLOR_GND,OUTPUT);
+  digitalWrite(BTN_ZONE_COLOR_GND,LOW);
 
   btn_a_down_t = 0;
   btn_a_up_t = 0;
   btn_b_down_t = 0;
   btn_b_up_t = 0;
   mode_mute_t = 0;
+  zone_color_mute_t = 0;
 
   set_state(STATE_SIGNUP);
 }
@@ -180,14 +237,24 @@ void set_state(int s)
 void loop()
 {
   //get input
+    //toggle mode
   if(!mode_mute_t && !digitalRead(BTN_MODE_PIN))
   {
     mode = (mode+1)%MODE_COUNT;
     mode_mute_t = 10;
-    if(mode == MODE_BOUNCY) for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone_bouncy;
-    else                    for(int i = 0; i < MAX_HIT_ZONE; i++) strip_subleds_zone[i] = color_zone_sticky;
+    set_color_blits();
   }
   else if(mode_mute_t) mode_mute_t--;
+    //toggle zone coloring
+  if(!zone_color_mute_t && !digitalRead(BTN_ZONE_COLOR_PIN))
+  {
+    zone_color = (zone_color+1)%ZONE_COLOR_COUNT;
+    zone_color_mute_t = 10;
+    set_color_blits();
+  }
+  else if(zone_color_mute_t) zone_color_mute_t--;
+
+    //read actual buttons
   if(!digitalRead(BTN_A_PIN)) { btn_a_down_t++; btn_a_up_t = 0; }
   else { btn_a_down_t = 0; btn_a_up_t++; }
   if(!digitalRead(BTN_B_PIN)) { btn_b_down_t++; btn_b_up_t = 0; }

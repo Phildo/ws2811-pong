@@ -21,8 +21,10 @@ int server;
 int serve;
 int bounce;
 unsigned int btn_a_down_t;
+unsigned int btn_a_press_t;
 unsigned int btn_a_up_t;
 unsigned int btn_b_down_t;
+unsigned int btn_b_press_t;
 unsigned int btn_b_up_t;
 int btn_a_hit_p;
 int missile_a_hit_p;
@@ -34,7 +36,7 @@ unsigned int btn_b_hit_t;
 //strip
 #define STRIP_LED_PIN     3
 #define STRIP_NUM_LEDS    100
-#define STRIP_BRIGHTNESS  128 //0-128
+#define STRIP_BRIGHTNESS  64 //0-128
 #define STRIP_LED_TYPE    WS2811
 #define STRIP_COLOR_ORDER BRG
 #define STRIP_FADE_N 10
@@ -95,13 +97,12 @@ void draw_pulsed_zones()
 {
   //a
   {
-    int half = hit_zone_a/2;
     int ceilhalf = (hit_zone_a+1)/2;
-    if(btn_a_down_t && btn_a_down_t < STRIP_FADE_N)
+    if(btn_a_press_t && btn_a_press_t < STRIP_FADE_N)
     {
       for(int i = 0; i < ceilhalf; i++)
       {
-        int f = (STRIP_FADE_N-1-((i*STRIP_FADE_N)/half))*btn_a_down_t/STRIP_FADE_N; //\_/
+        int f = STRIP_FADE_N-1-(((i*STRIP_FADE_N)/ceilhalf))*btn_a_press_t/STRIP_FADE_N; //\_/
         strip_leds[i]              = color_zone_fade[f];
         strip_leds[hit_zone_a-1-i] = color_zone_fade[f];
       }
@@ -110,24 +111,23 @@ void draw_pulsed_zones()
     {
       for(int i = 0; i < ceilhalf; i++)
       {
-        int f = STRIP_FADE_N-1-((i*STRIP_FADE_N)/half); //\_/
+        int f = STRIP_FADE_N-1-((i*STRIP_FADE_N)/ceilhalf); //\_/
         strip_leds[i]              = color_zone_fade[f];
         strip_leds[hit_zone_a-1-i] = color_zone_fade[f];
       }
     }
-    if(btn_a_down_t < hit_zone_a)
-      strip_leds[btn_a_down_t] = color_a;
+    if(btn_a_press_t < hit_zone_a)
+      strip_leds[btn_a_press_t] = color_a;
   }
 
   //b
   {
-    int half = hit_zone_b/2;
     int ceilhalf = (hit_zone_b+1)/2;
-    if(btn_b_down_t && btn_b_down_t < STRIP_FADE_N)
+    if(btn_b_press_t && btn_b_press_t < STRIP_FADE_N)
     {
       for(int i = 0; i < ceilhalf; i++)
       {
-        int f = (STRIP_FADE_N-1-((i*STRIP_FADE_N)/half))*btn_b_down_t/STRIP_FADE_N; //\_/
+        int f = STRIP_FADE_N-1-(((i*STRIP_FADE_N)/ceilhalf))*btn_b_press_t/STRIP_FADE_N; //\_/
         strip_leds[back(i)]              = color_zone_fade[f];
         strip_leds[back(hit_zone_b-1-i)] = color_zone_fade[f];
       }
@@ -136,20 +136,20 @@ void draw_pulsed_zones()
     {
       for(int i = 0; i < ceilhalf; i++)
       {
-        int f = STRIP_FADE_N-1-((i*STRIP_FADE_N)/half); //\_/
+        int f = STRIP_FADE_N-1-((i*STRIP_FADE_N)/ceilhalf); //\_/
         strip_leds[back(i)]              = color_zone_fade[f];
         strip_leds[back(hit_zone_b-1-i)] = color_zone_fade[f];
       }
     }
-    if(btn_b_down_t < hit_zone_b)
-      strip_leds[back(btn_b_down_t)] = color_b;
+    if(btn_b_press_t < hit_zone_b)
+      strip_leds[back(btn_b_press_t)] = color_b;
   }
 }
 
 void clear_lane()
 {
-  int imax = STRIP_NUM_LEDS-hit_zone_b;
-  for(int i = hit_zone_a; i < imax; i++)
+  int imax = back(hit_zone_b);
+  for(int i = hit_zone_a; i <= imax; i++)
     strip_leds[i] = color_dark;
 }
 
@@ -187,8 +187,10 @@ void setup()
   pinMode(BTN_B_PIN,INPUT_PULLUP);
 
   btn_a_down_t = 0;
+  btn_a_press_t = 0;
   btn_a_up_t = 0;
   btn_b_down_t = 0;
+  btn_b_press_t = 0;
   btn_b_up_t = 0;
 
   set_state(STATE_SIGNUP);
@@ -204,23 +206,25 @@ void set_state(int s)
     {
       if(btn_a_down_t >= btn_b_down_t)
       {
-        btn_a_down_t = 1;
-        btn_b_down_t = 0;
+        btn_a_down_t  = 1;
+        btn_b_down_t  = 0;
       }
       else
       {
-        btn_a_down_t = 0;
-        btn_b_down_t = 1;
+        btn_a_down_t  = 0;
+        btn_b_down_t  = 1;
       }
       local_score_a = 0;
       local_score_b = 0;
+      speed = 3;
+      hit_zone_a = MAX_HIT_ZONE;
+      hit_zone_b = MAX_HIT_ZONE;
+      draw_pulsed_zones();
+      clear_lane();
     }
       break;
     case STATE_PLAY:
     {
-      speed = 3;
-      hit_zone_a = MAX_HIT_ZONE;
-      hit_zone_b = MAX_HIT_ZONE;
       if(btn_a_down_t >= btn_b_down_t)
       {
         server = 1;
@@ -235,9 +239,9 @@ void set_state(int s)
       }
       serve = server;
       bounce = 0;
-      btn_a_hit_p = -1;
+      btn_a_hit_p     = -1;
       missile_a_hit_p = -1;
-      btn_b_hit_p = -1;
+      btn_b_hit_p     = -1;
       missile_b_hit_p = -1;
     }
       break;
@@ -253,8 +257,12 @@ void loop()
   //read buttons
   if(!digitalRead(BTN_A_PIN)) { btn_a_down_t++; btn_a_up_t = 0; }
   else { btn_a_down_t = 0; btn_a_up_t++; }
+  if(btn_a_press_t) btn_a_press_t++;
+  if(btn_a_down_t == 1) btn_a_press_t = 1;
   if(!digitalRead(BTN_B_PIN)) { btn_b_down_t++; btn_b_up_t = 0; }
   else { btn_b_down_t = 0; btn_b_up_t++; }
+  if(btn_b_press_t) btn_b_press_t++;
+  if(btn_b_down_t == 1) btn_b_press_t = 1;
 
   state_t++; if(state_t == 0) state_t = -1; //keep at max
 
@@ -280,41 +288,32 @@ void loop()
       else if(ball_p < 0)          { ball_p = 0;       set_state(STATE_SCORE); break; }
 
       //clear hits at midpoint
-           if(serve ==  1 && btn_b_hit_p != -1 && old_ball_p < STRIP_NUM_LEDS/2 && ball_p >= STRIP_NUM_LEDS/2) { btn_b_hit_p = -1; missile_b_hit_p = -1; }
-      else if(serve == -1 && btn_a_hit_p != -1 && old_ball_p > STRIP_NUM_LEDS/2 && ball_p <= STRIP_NUM_LEDS/2) { btn_a_hit_p = -1; missile_a_hit_p = -1; }
+      int midpoint = STRIP_NUM_LEDS/2;
+           if(serve ==  1 && old_ball_p < midpoint && ball_p >= midpoint) { btn_b_hit_p = -1; missile_b_hit_p = -1; }
+      else if(serve == -1 && old_ball_p > midpoint && ball_p <= midpoint) { btn_a_hit_p = -1; missile_a_hit_p = -1; }
 
       //handle hits
       int should_bounce = 0;
-      if(missile_a_hit_p == -1 && btn_a_down_t == 1)
+      if(btn_a_hit_p == -1 && btn_a_down_t == 1) btn_a_hit_p = ball_p;
+      if(btn_b_hit_p == -1 && btn_b_down_t == 1) btn_b_hit_p = ball_p;
+
+      if(serve == -1 && btn_a_press_t < hit_zone_a && ball_p <= btn_a_press_t)
       {
-        btn_a_hit_p = ball_p;
-        if(serve == -1)
-        {
-          if(btn_a_down_t < hit_zone_a && ball_p <= btn_a_down_t)
-          {
-            missile_a_hit_p = ball_p;
-            should_bounce = 1;
-          }
-        }
+        missile_a_hit_p = ball_p;
+        should_bounce = 1;
       }
-      if(btn_b_hit_p == -1 && btn_b_down_t == 1)
+      if(serve == 1 && btn_b_press_t < hit_zone_b && ball_p >= back(btn_b_press_t))
       {
-        btn_b_hit_p = ball_p;
-        if(serve == 1)
-        {
-          if(btn_b_down_t > back(hit_zone_a) && ball_p >= back(btn_b_down_t))
-          {
-            missile_b_hit_p = ball_p;
-            should_bounce = 1;
-          }
-        }
+        missile_b_hit_p = ball_p;
+        should_bounce = 1;
       }
+
       if(should_bounce)
       {
         bounce++;
         speed = 3+(bounce/3);
-        if(serve == -1) { serve =  1; hit_zone_a = MAX_HIT_ZONE-((bounce+2)/3); } //a served
-        if(serve ==  1) { serve = -1; hit_zone_b = MAX_HIT_ZONE-((bounce+2)/3); } //b served
+             if(serve == -1) { serve =  1; hit_zone_a = MAX_HIT_ZONE-((bounce+2)/3); } //a served
+        else if(serve ==  1) { serve = -1; hit_zone_b = MAX_HIT_ZONE-((bounce+2)/3); } //b served
         if(hit_zone_a < 4) hit_zone_a = 4;
         if(hit_zone_b < 4) hit_zone_b = 4;
       }
@@ -337,6 +336,7 @@ void loop()
       case STATE_SIGNUP:
       {
         draw_pulsed_zones();
+        clear_lane();
 
         if(btn_a_down_t || btn_b_down_t) //at least one down
         {
@@ -425,8 +425,10 @@ void loop()
         }
 
         //draw hits
-        if(btn_a_hit_p != -1) strip_leds[btn_a_hit_p] = color_a;
-        if(btn_b_hit_p != -1) strip_leds[btn_b_hit_p] = color_b;
+        if(btn_a_hit_p     != -1) strip_leds[btn_a_hit_p]     = color_a;
+        if(missile_a_hit_p != -1) strip_leds[missile_a_hit_p] = color_a;
+        if(btn_b_hit_p     != -1) strip_leds[btn_b_hit_p]     = color_b;
+        if(missile_b_hit_p != -1) strip_leds[missile_b_hit_p] = color_b;
 
         //draw ball
         strip_leds[ball_p] = color_ball;

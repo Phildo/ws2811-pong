@@ -27,15 +27,15 @@ unsigned int btn_b_press_t;
 unsigned int btn_b_up_t;
 int btn_a_hit_p;
 int missile_a_hit_p;
-unsigned int btn_a_hit_t;
+unsigned int missile_a_hit_t;
 int btn_b_hit_p;
 int missile_b_hit_p;
-unsigned int btn_b_hit_t;
+unsigned int missile_b_hit_t;
 
 //strip
 #define STRIP_LED_PIN     3
 #define STRIP_NUM_LEDS    100
-#define STRIP_BRIGHTNESS  64 //0-128
+#define STRIP_BRIGHTNESS  128 //0-128
 #define STRIP_LED_TYPE    WS2811
 #define STRIP_COLOR_ORDER BRG
 #define STRIP_FADE_N 10
@@ -54,7 +54,7 @@ CRGB color_a;
 CRGB color_b;
 CRGB color_ball;
 CRGB color_zone;
-CRGB color_dark;
+CRGB color_clear;
 CRGB color_a_fade[STRIP_FADE_N];
 CRGB color_b_fade[STRIP_FADE_N];
 CRGB color_zone_fade[STRIP_FADE_N];
@@ -73,7 +73,7 @@ int back(int i)
 
 void cache_colors()
 {
-  int bright = 3; //takes away the lowest fractions (turns 1/10 into 2/11)
+  int bright = 2; //takes away the lowest fractions (turns 1/10 into 2/11)
   int l;
   int r;
   int g;
@@ -106,7 +106,7 @@ void init_strip()
   for(; i < MAX_HIT_ZONE; i++)
     strip_leds[i] = color_zone;
   for(; i < STRIP_NUM_LEDS-MAX_HIT_ZONE; i++)
-    strip_leds[i] = color_dark;
+    strip_leds[i] = color_clear;
   for(; i < STRIP_NUM_LEDS; i++)
     strip_leds[i] = color_zone;
 }
@@ -184,14 +184,14 @@ void draw_pulsed_lane()
         //int f = (((len-i)*term_one)/term_two); //<- would be above eqn
         int f = (((len-i)*term_one)/term_two)-btn_a_press_t; //<- but I instead modified this, so it isn't _any_ of the eqns above
         if(f >= 0) strip_leds[zone_a_len+i] = color_a_fade[f];
-        else       strip_leds[zone_a_len+i] = color_dark;
+        else       strip_leds[zone_a_len+i] = color_clear;
       }
     }
     else //just clear lane
     {
       int half = STRIP_NUM_LEDS/2;
       for(int i = zone_a_len; i < half; i++)
-        strip_leds[i] = color_dark;
+        strip_leds[i] = color_clear;
     }
   }
 
@@ -209,14 +209,14 @@ void draw_pulsed_lane()
         //int f = (((len-i)*term_one)/term_two); //<- would be above eqn
         int f = (((len-i)*term_one)/term_two)-btn_b_press_t; //<- but I instead modified this, so it isn't _any_ of the eqns above
         if(f >= 0) strip_leds[back(zone_b_len+i)] = color_b_fade[f];
-        else       strip_leds[back(zone_b_len+i)] = color_dark;
+        else       strip_leds[back(zone_b_len+i)] = color_clear;
       }
     }
     else //just clear lane
     {
       int tip = back(zone_b_len);
       for(int i = STRIP_NUM_LEDS/2; i <= tip; i++)
-        strip_leds[i] = color_dark;
+        strip_leds[i] = color_clear;
     }
   }
 }
@@ -225,7 +225,7 @@ void clear_lane()
 {
   int imax = back(zone_b_len);
   for(int i = zone_a_len; i <= imax; i++)
-    strip_leds[i] = color_dark;
+    strip_leds[i] = color_clear;
 }
 
 void setup()
@@ -251,7 +251,7 @@ void setup()
   color_zone /= 2;
   color_zone /= 2;
   color_zone /= 2;
-  color_dark = black;
+  color_clear = black;
   cache_colors();
   init_strip();
   FastLED.addLeds<STRIP_LED_TYPE, STRIP_LED_PIN, STRIP_COLOR_ORDER>(strip_leds, STRIP_NUM_LEDS).setCorrection( TypicalLEDStrip );
@@ -264,9 +264,11 @@ void setup()
   btn_a_down_t = 0;
   btn_a_press_t = 0;
   btn_a_up_t = 0;
+  missile_a_hit_t = 0;
   btn_b_down_t = 0;
   btn_b_press_t = 0;
   btn_b_up_t = 0;
+  missile_b_hit_t = 0;
 
   set_state(STATE_SIGNUP);
 }
@@ -326,14 +328,17 @@ void set_state(int s)
 void loop()
 {
   //read buttons
-  if(!digitalRead(BTN_A_PIN)) { btn_a_down_t++; btn_a_up_t = 0; }
-  else { btn_a_down_t = 0; btn_a_up_t++; }
+  if(!digitalRead(BTN_A_PIN)) { btn_a_down_t++;   btn_a_up_t = 0; }
+  else                        { btn_a_down_t = 0; btn_a_up_t++;   }
   if(btn_a_press_t) btn_a_press_t++;
   if(btn_a_down_t == 1 && btn_a_hit_p == -1) btn_a_press_t = 1;
-  if(!digitalRead(BTN_B_PIN)) { btn_b_down_t++; btn_b_up_t = 0; }
-  else { btn_b_down_t = 0; btn_b_up_t++; }
+  if(missile_a_hit_t) missile_a_hit_t++;
+
+  if(!digitalRead(BTN_B_PIN)) { btn_b_down_t++;   btn_b_up_t = 0; }
+  else                        { btn_b_down_t = 0; btn_b_up_t++;   }
   if(btn_b_press_t) btn_b_press_t++;
   if(btn_b_down_t == 1 && btn_b_hit_p == -1) btn_b_press_t = 1;
+  if(missile_b_hit_t) missile_b_hit_t++;
 
   state_t++; if(state_t == 0) state_t = -1; //keep at max
 
@@ -371,11 +376,13 @@ void loop()
       if(serve == -1 && btn_a_press_t < zone_a_len && ball_p <= btn_a_press_t)
       {
         missile_a_hit_p = ball_p;
+        missile_a_hit_t = 1;
         should_bounce = 1;
       }
       if(serve == 1 && btn_b_press_t < zone_b_len && ball_p >= back(btn_b_press_t))
       {
         missile_b_hit_p = ball_p;
+        missile_b_hit_t = 1;
         should_bounce = 1;
       }
 
@@ -400,6 +407,7 @@ void loop()
   }
 
   //draw
+  color_clear = black;
   //for(int i = 0; i < 10; i++) //used to test performance
   {
     switch(state)
@@ -452,12 +460,33 @@ void loop()
         break;
       case STATE_PLAY:
       {
+        int t = missile_a_hit_t;
+        if(!missile_a_hit_t || (missile_a_hit_t && missile_b_hit_t && missile_a_hit_t > missile_b_hit_t)) t = missile_b_hit_t; //t == the lowest non-zero missile_[ab]_hit_t, or 0
+        if(t && t < STRIP_FADE_N) color_clear = color_fade[STRIP_FADE_N-t];
+
         draw_pulsed_zones();
         draw_pulsed_lane();
 
         //draw hits
         if(missile_a_hit_p != -1) strip_leds[missile_a_hit_p] = color_a;
         if(missile_b_hit_p != -1) strip_leds[missile_b_hit_p] = color_b;
+
+        //particles
+        int off;
+        off = missile_a_hit_t/2;
+        if(missile_a_hit_t && off < STRIP_FADE_N*3)
+        {
+          off = off%STRIP_FADE_N;
+          if(missile_a_hit_p-off >= 0)              strip_leds[missile_a_hit_p-off] = color_fade[STRIP_FADE_N-1-off];
+          if(missile_a_hit_p+off <  STRIP_NUM_LEDS) strip_leds[missile_a_hit_p+off] = color_fade[STRIP_FADE_N-1-off];
+        }
+        off = missile_b_hit_t/2;
+        if(missile_b_hit_t && off < STRIP_FADE_N*3)
+        {
+          off = off%STRIP_FADE_N;
+          if(missile_b_hit_p-off >= 0)              strip_leds[missile_b_hit_p-off] = color_fade[STRIP_FADE_N-1-off];
+          if(missile_b_hit_p+off <  STRIP_NUM_LEDS) strip_leds[missile_b_hit_p+off] = color_fade[STRIP_FADE_N-1-off];
+        }
 
         //draw ball
         strip_leds[ball_p] = color_ball;

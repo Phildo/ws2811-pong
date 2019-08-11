@@ -466,6 +466,19 @@ void loop()
 
         draw_pulsed_zones();
         draw_pulsed_lane();
+        if(bounce%3)
+        {
+          if(serve == 1 && missile_a_hit_t < STRIP_FADE_N*2)
+          {
+            if(missile_a_hit_t > STRIP_FADE_N && (missile_a_hit_t/2)%2) strip_leds[zone_a_len] = red;
+            else                                                        strip_leds[zone_a_len] = color_zone;
+          }
+          if(serve == -1 && missile_b_hit_t < STRIP_FADE_N*2)
+          {
+            if(missile_b_hit_t > STRIP_FADE_N && (missile_b_hit_t/2)%2) strip_leds[back(zone_b_len)] = red;
+            else                                                        strip_leds[back(zone_b_len)] = color_zone;
+          }
+        }
 
         //draw hits
         if(missile_a_hit_p != -1) strip_leds[missile_a_hit_p] = color_a;

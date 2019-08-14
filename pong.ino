@@ -538,10 +538,8 @@ void loop()
         }
 
         //draw hits
-        if(btn_a_hit_p     != -1) strip_leds[btn_a_hit_p]     = color_a;
-        if(missile_a_hit_p != -1) strip_leds[missile_a_hit_p] = color_a;
-        if(btn_b_hit_p     != -1) strip_leds[btn_b_hit_p]     = color_b;
-        if(missile_b_hit_p != -1) strip_leds[missile_b_hit_p] = color_b;
+        if(serve == -1 && btn_a_hit_p != -1) strip_leds[btn_a_hit_p] = color_a;
+        if(serve ==  1 && btn_b_hit_p != -1) strip_leds[btn_b_hit_p] = color_b;
 
         //draw ball
         strip_leds[ball_p] = color_ball;
